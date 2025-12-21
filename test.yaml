@@ -35,6 +35,9 @@ switch:
   - platform: gpio
     name: "Relay"
     pin:
-      number: GPIO2
+      # NOTE: This relay is connected to GPIO0. GPIO0 must be HIGH for normal boot;
+      # pull it LOW only when intentionally entering the bootloader (flashing).
+      # If flashing fails, disconnect the relay input from GPIO0 or use a jumper.
+      number: GPIO0
       inverted: true
     restore_mode: RESTORE_DEFAULT_OFF
