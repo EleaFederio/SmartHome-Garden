@@ -1,0 +1,31 @@
+esphome:
+  name: pump-waterlevel
+  platform: esp32
+  board: esp32dev
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  password: !secret ota_password
+
+sensor:
+  - platform: adc
+    pin: GPIO34
+    name: "Water Level"
+    unit_of_measurement: "%"
+    update_interval: 60s
+
+switch:
+  - platform: gpio
+    pin: GPIO12
+    name: "Pump"
+    id: pump_switch
