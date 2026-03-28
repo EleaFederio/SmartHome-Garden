@@ -1,31 +1,43 @@
 esphome:
   name: pump-waterlevel
-  platform: esp32
-  board: esp32dev
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
 
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  # Add an access point for the captive portal to work
+  ap:
+    ssid: "Pump-Waterlevel Fallback AP"
 
 logger:
   level: DEBUG
 
-api:
-  encryption:
-    key: !secret api_encryption_key
+captive_portal:
 
-ota:
-  password: !secret ota_password
+web_server:
+  port: 80
 
 sensor:
-  - platform: adc
-    pin: GPIO34
-    name: "Water Level"
-    unit_of_measurement: "%"
-    update_interval: 60s
+  - platform: ultrasonic
+    # NOTE: GPIO2 is a strapping pin. If you have boot issues,
+    # you may need to move this to a non-strapping pin like GPIO3.
+    name: "Water Tank Distance"
+    trigger_pin: GPIO1
+    # Using GPIO3 for the echo pin as it is not a strapping pin.
+    echo_pin: GPIO3
+    update_interval: 5s
+    accuracy_decimals: 2
+    unit_of_measurement: "m"
+    timeout: 4m
 
-switch:
-  - platform: gpio
-    pin: GPIO12
-    name: "Pump"
-    id: pump_switch
+# switch:
+#   - platform: gpio
+#     # NOTE: GPIO12 is reserved for the internal SPI flash on the ESP32-C3.
+#     # Using GPIO4 instead. Please ensure your pump relay is connected to GPIO4.
+#     pin: GPIO4
+#     name: "Pump"
+#     id: pump_switch

@@ -23,16 +23,18 @@ wifi:
 
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
-    ssid: "Barney Fallback Hotspot"
-    password: "t5WqPlpHb0WW"
+    ssid: "Blinking Relay"
+    password: "BUGC1234"
 
 captive_portal:
 
 web_server:
   port: 80
+  css_include: style.css
 
 switch:
   - platform: gpio
+    id: relay
     name: "Relay"
     pin:
       # NOTE: This relay is connected to GPIO0. GPIO0 must be HIGH for normal boot;
@@ -41,3 +43,223 @@ switch:
       number: GPIO0
       inverted: true
     restore_mode: RESTORE_DEFAULT_OFF
+
+output:
+  - platform: gpio
+    id: led_output
+    pin: GPIO2
+    inverted: true
+
+light:
+  - platform: binary
+    id: led
+    name: "Built-in LED"
+    output: led_output
+
+button:
+  - platform: template
+    name: "Blink 1s"
+    on_press:
+      if:
+        condition:
+          script.is_running: blink_1s_script
+        then:
+          - script.stop: blink_1s_script
+        else:
+          - script.execute: blink_1s_script
+  - platform: template
+    name: "Blink 500ms"
+    on_press:
+      if:
+        condition:
+          script.is_running: blink_500ms_script
+        then:
+          - script.stop: blink_500ms_script
+        else:
+          - script.execute: blink_500ms_script
+  - platform: template
+    name: "Blink 200ms"
+    on_press:
+      if:
+        condition:
+          script.is_running: blink_200ms_script
+        then:
+          - script.stop: blink_200ms_script
+        else:
+          - script.execute: blink_200ms_script
+  - platform: template
+    name: "Blink 80ms"
+    on_press:
+      if:
+        condition:
+          script.is_running: blink_80ms_script
+        then:
+          - script.stop: blink_80ms_script
+        else:
+          - script.execute: blink_80ms_script
+  - platform: template
+    name: "Blink 10ms"
+    on_press:
+      if:
+        condition:
+          script.is_running: blink_10ms_script
+        then:
+          - script.stop: blink_10ms_script
+        else:
+          - script.execute: blink_10ms_script
+  - platform: template
+    name: "Blink 3ms"
+    on_press:
+      if:
+        condition:
+          script.is_running: blink_3ms_script
+        then:
+          - script.stop: blink_3ms_script
+        else:
+          - script.execute: blink_3ms_script
+  - platform: template
+    name: "LED Blink 1s"
+    on_press:
+      if:
+        condition:
+          script.is_running: led_blink_1s_script
+        then:
+          - script.stop: led_blink_1s_script
+        else:
+          - script.execute: led_blink_1s_script
+  - platform: template
+    name: "LED Blink 500ms"
+    on_press:
+      if:
+        condition:
+          script.is_running: led_blink_500ms_script
+        then:
+          - script.stop: led_blink_500ms_script
+        else:
+          - script.execute: led_blink_500ms_script
+  - platform: template
+    name: "LED Blink 200ms"
+    on_press:
+      if:
+        condition:
+          script.is_running: led_blink_200ms_script
+        then:
+          - script.stop: led_blink_200ms_script
+        else:
+          - script.execute: led_blink_200ms_script
+  - platform: template
+    name: "LED Blink 50ms"
+    on_press:
+      if:
+        condition:
+          script.is_running: led_blink_50ms_script
+        then:
+          - script.stop: led_blink_50ms_script
+        else:
+          - script.execute: led_blink_50ms_script
+  - platform: template
+    name: "LED Blink 3ms"
+    on_press:
+      if:
+        condition:
+          script.is_running: led_blink_3ms_script
+        then:
+          - script.stop: led_blink_3ms_script
+        else:
+          - script.execute: led_blink_3ms_script
+  - platform: template
+    name: "LED Blink 1ms"
+    on_press:
+      if:
+        condition:
+          script.is_running: led_blink_1ms_script
+        then:
+          - script.stop: led_blink_1ms_script
+        else:
+          - script.execute: led_blink_1ms_script
+
+script:
+  - id: blink_1s_script
+    then:
+      repeat:
+        count: 1000000
+        then:
+          - switch.toggle: relay
+          - delay: 1s
+  - id: blink_500ms_script
+    then:
+      repeat:
+        count: 1000000
+        then:
+          - switch.toggle: relay
+          - delay: 500ms
+  - id: blink_200ms_script
+    then:
+      repeat:
+        count: 1000000
+        then:
+          - switch.toggle: relay
+          - delay: 200ms
+  - id: blink_80ms_script
+    then:
+      repeat:
+        count: 1000000
+        then:
+          - switch.toggle: relay
+          - delay: 80ms
+  - id: blink_10ms_script
+    then:
+      repeat:
+        count: 1000000
+        then:
+          - switch.toggle: relay
+          - delay: 10ms
+  - id: blink_3ms_script
+    then:
+      repeat:
+        count: 1000000
+        then:
+          - switch.toggle: relay
+          - delay: 3ms
+  - id: led_blink_1s_script
+    then:
+      repeat:
+        count: 1000000
+        then:
+          - light.toggle: led
+          - delay: 1s
+  - id: led_blink_500ms_script
+    then:
+      repeat:
+        count: 1000000
+        then:
+          - light.toggle: led
+          - delay: 500ms
+  - id: led_blink_200ms_script
+    then:
+      repeat:
+        count: 1000000
+        then:
+          - light.toggle: led
+          - delay: 200ms
+  - id: led_blink_50ms_script
+    then:
+      repeat:
+        count: 1000000
+        then:
+          - light.toggle: led
+          - delay: 50ms
+  - id: led_blink_3ms_script
+    then:
+      repeat:
+        count: 1000000
+        then:
+          - light.toggle: led
+          - delay: 3ms
+  - id: led_blink_1ms_script
+    then:
+      repeat:
+        count: 1000000
+        then:
+          - light.toggle: led
+          - delay: 1ms

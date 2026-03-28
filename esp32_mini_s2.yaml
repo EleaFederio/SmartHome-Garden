@@ -1,0 +1,42 @@
+esphome:
+  name: water_level
+  friendly_name: water_level
+  platformio_options:
+    upload_speed: 115200
+
+esp32:
+  board: lolin_s2_mini
+  variant: ESP32S2
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "KM4TMO8ntvjN/pPr+FoS+NQmwO5jMZ92V0mgzJPEPMk="
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "ESP 32 Mini"
+    password: "password"
+
+captive_portal:
+
+web_server:
+  port: 80
+
+sensor:
+  - platform: ultrasonic
+    name: "Water Tank Distance"
+    trigger_pin: GPIO1
+    echo_pin: GPIO2
+    update_interval: 5s
+    accuracy_decimals: 1
+    unit_of_measurement: "cm"
