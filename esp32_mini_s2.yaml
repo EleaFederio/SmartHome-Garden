@@ -5,8 +5,7 @@ esphome:
     upload_speed: 115200
 
 esp32:
-  board: lolin_s2_mini
-  variant: ESP32S2
+  board: esp32-c3-devkitm-1
   framework:
     type: esp-idf
 

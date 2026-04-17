@@ -6,6 +6,9 @@ esp32:
   framework:
     type: esp-idf
 
+api:
+  password: !secret esphome_api_password
+
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
@@ -26,13 +29,24 @@ sensor:
     # NOTE: GPIO2 is a strapping pin. If you have boot issues,
     # you may need to move this to a non-strapping pin like GPIO3.
     name: "Water Tank Distance"
-    trigger_pin: GPIO1
+    trigger_pin: GPIO2
     # Using GPIO3 for the echo pin as it is not a strapping pin.
-    echo_pin: GPIO3
-    update_interval: 5s
+    echo_pin: GPIO1
+    update_interval: 2s
     accuracy_decimals: 2
     unit_of_measurement: "m"
     timeout: 4m
+    id: distance_sensor
+  - platform: template
+    name: "Water Level"
+    unit_of_measurement: "cm"
+    accuracy_decimals: 1
+    lambda: return (0.68 - id(distance_sensor).state) * 100;
+  - platform: template
+    name: "Water Level Percentage"
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    lambda: return ((0.68 - id(distance_sensor).state) / 0.68) * 100;
 
 # switch:
 #   - platform: gpio

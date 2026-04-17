@@ -1,0 +1,164 @@
+substitutions:
+  pump_switch_entity: switch.nft_pump
+  sensor_resume_delay: 30s
+
+esphome:
+  name: nft-sensor
+  friendly_name: NFT-sensor
+  platformio_options:
+    upload_port: COM5
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+
+api:
+  encryption:
+    key: !secret nft_key
+
+ota:
+  - platform: esphome
+
+
+wifi:
+  networks:
+    - ssid: !secret wifi_ssid
+      password: !secret wifi_password
+  output_power: 8.5dB
+  manual_ip:
+    static_ip: 192.168.1.112
+    gateway: 192.168.1.1
+    subnet: 255.255.255.0
+  
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "NFT Sensor AP"
+    password: "hahaha1234"
+    ap_timeout: 15s
+
+logger:
+  level: VERBOSE
+
+binary_sensor:
+  - platform: homeassistant
+    id: nft_pump_running
+    entity_id: ${pump_switch_entity}
+    internal: true
+    on_press:
+      then:
+        - logger.log: "NFT pump is running, pausing TDS/EC updates"
+        - component.suspend: tds_adc
+        - component.suspend: tds_raw_ppm
+        - component.suspend: tds_calibrated_ppm
+        - component.suspend: tds_comp_voltage
+    on_release:
+      then:
+        - logger.log: "NFT pump stopped, waiting before resuming TDS/EC updates"
+        - delay: ${sensor_resume_delay}
+        - if:
+            condition:
+              binary_sensor.is_off: nft_pump_running
+            then:
+              - component.resume:
+                  id: tds_adc
+                  update_interval: 1s
+              - component.resume:
+                  id: tds_raw_ppm
+                  update_interval: 1s
+              - component.resume:
+                  id: tds_calibrated_ppm
+                  update_interval: 1s
+              - component.resume:
+                  id: tds_comp_voltage
+                  update_interval: 1s
+              - component.update: tds_adc
+              - component.update: tds_raw_ppm
+              - component.update: tds_calibrated_ppm
+              - component.update: tds_comp_voltage
+
+number:
+  - platform: template
+    name: "TDS Calibration Scale"
+    id: tds_scale
+    optimistic: true
+    restore_value: true
+    min_value: 0.1
+    max_value: 3.0
+    step: 0.01
+    initial_value: 1.0
+
+  - platform: template
+    name: "TDS Calibration Offset"
+    id: tds_offset
+    optimistic: true
+    restore_value: true
+    min_value: -500
+    max_value: 500
+    step: 1
+    initial_value: 0
+
+  - platform: template
+    name: "Water Temperature"
+    id: water_temp_c
+    optimistic: true
+    restore_value: true
+    min_value: 0
+    max_value: 50
+    step: 0.1
+    initial_value: 25.0
+    unit_of_measurement: "C"
+
+sensor:
+  - platform: adc
+    pin: GPIO0
+    name: "TDS ADC"
+    id: tds_adc
+    update_interval: 1s
+    attenuation: 12db
+    unit_of_measurement: V
+    accuracy_decimals: 3
+    filters:
+      - sliding_window_moving_average:
+          window_size: 10
+          send_every: 1
+
+  - platform: template
+    name: "TDS Raw ppm"
+    id: tds_raw_ppm
+    lambda: |-
+      float voltage = id(tds_adc).state;
+      float compensation_coefficient = 1.0f + 0.02f * (id(water_temp_c).state - 25.0f);
+      float compensated_voltage = voltage / compensation_coefficient;
+      float tds = (133.42f * compensated_voltage * compensated_voltage * compensated_voltage
+                  - 255.86f * compensated_voltage * compensated_voltage
+                  + 857.39f * compensated_voltage) * 0.5f;
+      if (tds < 0) return 0.0f;
+      return tds;
+    unit_of_measurement: "ppm"
+    accuracy_decimals: 0
+    update_interval: 1s
+
+  - platform: template
+    name: "TDS ppm"
+    id: tds_calibrated_ppm
+    lambda: |-
+      float tds = id(tds_raw_ppm).state;
+      tds = tds * id(tds_scale).state + id(tds_offset).state;
+      if (tds < 0) return 0.0f;
+      return tds;
+    unit_of_measurement: "ppm"
+    accuracy_decimals: 0
+    update_interval: 1s
+
+  - platform: template
+    name: "TDS Compensated Voltage"
+    id: tds_comp_voltage
+    lambda: |-
+      float voltage = id(tds_adc).state;
+      float compensation_coefficient = 1.0f + 0.02f * (id(water_temp_c).state - 25.0f);
+      return voltage / compensation_coefficient;
+    unit_of_measurement: "V"
+    accuracy_decimals: 3
+    update_interval: 1s
