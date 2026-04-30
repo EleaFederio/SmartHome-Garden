@@ -105,7 +105,7 @@ interval:
             lambda: 'return id(nft_pump_mode).state == "Eco";'
           then:
             - script.execute: eco_cycle
-  - interval: 25min
+  - interval: 30min
     then:
       - if:
           condition:

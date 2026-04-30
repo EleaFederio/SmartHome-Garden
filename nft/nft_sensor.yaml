@@ -39,20 +39,28 @@ wifi:
     ap_timeout: 15s
 
 logger:
-  level: VERBOSE
+  level: DEBUG
+
+one_wire:
+  - platform: gpio
+    pin: GPIO4
+
+globals:
+  - id: tds_pause_active
+    type: bool
+    restore_value: no
+    initial_value: "false"
 
 binary_sensor:
   - platform: homeassistant
+    name: "NFT Pump Running Sync"
     id: nft_pump_running
     entity_id: ${pump_switch_entity}
-    internal: true
     on_press:
       then:
         - logger.log: "NFT pump is running, pausing TDS/EC updates"
-        - component.suspend: tds_adc
-        - component.suspend: tds_raw_ppm
-        - component.suspend: tds_calibrated_ppm
-        - component.suspend: tds_comp_voltage
+        - lambda: |-
+            id(tds_pause_active) = true;
     on_release:
       then:
         - logger.log: "NFT pump stopped, waiting before resuming TDS/EC updates"
@@ -61,18 +69,8 @@ binary_sensor:
             condition:
               binary_sensor.is_off: nft_pump_running
             then:
-              - component.resume:
-                  id: tds_adc
-                  update_interval: 1s
-              - component.resume:
-                  id: tds_raw_ppm
-                  update_interval: 1s
-              - component.resume:
-                  id: tds_calibrated_ppm
-                  update_interval: 1s
-              - component.resume:
-                  id: tds_comp_voltage
-                  update_interval: 1s
+              - lambda: |-
+                  id(tds_pause_active) = false;
               - component.update: tds_adc
               - component.update: tds_raw_ppm
               - component.update: tds_calibrated_ppm
@@ -110,7 +108,67 @@ number:
     initial_value: 25.0
     unit_of_measurement: "C"
 
+  - platform: template
+    name: "pH Calibration Slope"
+    id: ph_slope
+    optimistic: true
+    restore_value: true
+    min_value: -20
+    max_value: 20
+    step: 0.001
+    initial_value: -5.556
+
+  - platform: template
+    name: "pH Calibration Offset"
+    id: ph_offset
+    optimistic: true
+    restore_value: true
+    min_value: -20
+    max_value: 30
+    step: 0.001
+    initial_value: 20.889
+
 sensor:
+  - platform: dallas_temp
+    name: "Hydroponic Water Temperature"
+    id: hydro_water_temp_c
+    update_interval: 3s
+    accuracy_decimals: 2
+    unit_of_measurement: "C"
+
+  - platform: adc
+    pin: GPIO1
+    name: "pH ADC"
+    id: ph_adc
+    update_interval: 3s
+    attenuation: 12db
+    unit_of_measurement: V
+    accuracy_decimals: 3
+    filters:
+      - lambda: |-
+          if (id(tds_pause_active)) {
+            return {};
+          }
+          return x;
+      - sliding_window_moving_average:
+          window_size: 10
+          send_every: 1
+
+  - platform: template
+    name: "pH"
+    id: ph_value
+    lambda: |-
+      if (id(tds_pause_active)) {
+        return {};
+      }
+      float ph = id(ph_adc).state * id(ph_slope).state + id(ph_offset).state;
+      if (ph < 0.0f) return 0.0f;
+      if (ph > 14.0f) return 14.0f;
+      return ph;
+    unit_of_measurement: "pH"
+    accuracy_decimals: 2
+    update_interval: 3s
+
   - platform: adc
     pin: GPIO0
     name: "TDS ADC"
@@ -120,6 +178,11 @@ sensor:
     unit_of_measurement: V
     accuracy_decimals: 3
     filters:
+      - lambda: |-
+          if (id(tds_pause_active)) {
+            return {};
+          }
+          return x;
       - sliding_window_moving_average:
           window_size: 10
           send_every: 1
@@ -128,6 +191,9 @@ sensor:
     name: "TDS Raw ppm"
     id: tds_raw_ppm
     lambda: |-
+      if (id(tds_pause_active)) {
+        return {};
+      }
       float voltage = id(tds_adc).state;
       float compensation_coefficient = 1.0f + 0.02f * (id(water_temp_c).state - 25.0f);
       float compensated_voltage = voltage / compensation_coefficient;
@@ -144,6 +210,9 @@ sensor:
     name: "TDS ppm"
     id: tds_calibrated_ppm
     lambda: |-
+      if (id(tds_pause_active)) {
+        return {};
+      }
       float tds = id(tds_raw_ppm).state;
       tds = tds * id(tds_scale).state + id(tds_offset).state;
       if (tds < 0) return 0.0f;
@@ -156,6 +225,9 @@ sensor:
     name: "TDS Compensated Voltage"
     id: tds_comp_voltage
     lambda: |-
+      if (id(tds_pause_active)) {
+        return {};
+      }
       float voltage = id(tds_adc).state;
       float compensation_coefficient = 1.0f + 0.02f * (id(water_temp_c).state - 25.0f);
       return voltage / compensation_coefficient;

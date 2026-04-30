@@ -1,0 +1,38 @@
+esphome:
+  name: water_temp
+  friendly_name: water_temp
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+
+api:
+  password: !secret water_temp_pw
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  manual_ip:
+    static_ip: 192.168.1.115
+    gateway: 192.168.1.1
+    subnet: 255.255.255.0
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Water Temp AP"
+    password: "password"
+
+logger:
+  level: DEBUG
+
+one_wire:
+  - platform: gpio
+    pin: GPIO4
+
+sensor:
+  - platform: dallas_temp
+    name: "Hydroponic Water Temperature"
+    id: hydro_water_temp_c
+    update_interval: 10s
+    accuracy_decimals: 2
+    unit_of_measurement: "C"
