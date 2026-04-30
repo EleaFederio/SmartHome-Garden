@@ -1,13 +1,15 @@
 # NFT ESPHome Setup
 
-This folder contains the ESPHome configs for the NFT hydroponics pump and nutrient sensor.
+This folder contains the ESPHome configs for the NFT hydroponics pump, nutrient sensor, and water temperature sensor.
 
 ## Files
 
 - `pumpy.yaml`
   Controls the NFT water pump using an ESP8266 relay board.
 - `nft_sensor.yaml`
-  Reads TDS-related values on an ESP32-C3 and pauses sensor updates while the pump is running to reduce reading noise.
+  Reads TDS, pH, and DS18B20 water temperature on an ESP32-C3 and pauses noisy analog readings while the pump is running.
+- `water_temp.yaml`
+  Standalone ESP32-C3 config for a DS18B20 water temperature probe.
 
 ## Devices
 
@@ -36,10 +38,15 @@ Important hardware note:
 
 - Device name: `nft-sensor`
 - Board: `esp32-c3-devkitm-1`
-- ADC pin: `GPIO0`
+- TDS ADC pin: `GPIO0`
+- pH ADC pin: `GPIO1`
+- DS18B20 data pin: `GPIO4`
 
 Exposed sensor values:
 
+- `Hydroponic Water Temperature`
+- `pH ADC`
+- `pH`
 - `TDS ADC`
 - `TDS Raw ppm`
 - `TDS ppm`
@@ -47,18 +54,52 @@ Exposed sensor values:
 - `Water Temperature`
 - `TDS Calibration Scale`
 - `TDS Calibration Offset`
+- `pH Calibration Slope`
+- `pH Calibration Offset`
+
+### Standalone water temperature controller
+
+- Device name: `water_temp`
+- Board: `esp32-c3-devkitm-1`
+- DS18B20 data pin: `GPIO4`
+- Static IP: `192.168.1.115`
+
+Exposed sensor values:
+
+- `Hydroponic Water Temperature`
+
+## Wiring Notes
+
+### DS18B20
+
+- `VCC` -> `3.3V`
+- `GND` -> `GND`
+- `DATA` -> `GPIO4`
+- Add a `4.7k` pull-up resistor between `DATA` and `3.3V`
+
+### TDS module
+
+- Analog output -> `GPIO0`
+- `VCC` -> module-required power
+- `GND` -> `GND`
+
+### pH module
+
+- Analog output -> `GPIO1`
+- `VCC` -> module-required power
+- `GND` -> `GND`
 
 ## TDS Noise Protection
 
-The sensor config is designed to avoid noisy TDS/EC readings caused by water movement and pump electrical noise.
+The sensor config is designed to avoid noisy analog readings caused by water movement and pump electrical noise.
 
 How it works:
 
 1. `nft_sensor.yaml` listens to the Home Assistant entity defined by `pump_switch_entity`.
 2. When the pump turns on, these components are suspended:
-   `tds_adc`, `tds_raw_ppm`, `tds_calibrated_ppm`, and `tds_comp_voltage`.
+   `ph_adc`, `ph_value`, `tds_adc`, `tds_raw_ppm`, `tds_calibrated_ppm`, and `tds_comp_voltage`.
 3. When the pump turns off, the sensor waits for `sensor_resume_delay`.
-4. After the delay, if the pump is still off, sensor updates resume and an immediate refresh is triggered.
+4. After the delay, if the pump is still off, analog sensor updates resume and the TDS chain gets an immediate refresh.
 
 Default values:
 
@@ -96,27 +137,47 @@ Tunable calibration values:
 - `TDS Calibration Offset`
 - `Water Temperature`
 
+pH is calculated in one step:
+
+1. `pH`
+   Applies a linear calibration to the measured pH module voltage:
+   `ph = voltage * slope + offset`
+
+Tunable pH calibration values:
+
+- `pH Calibration Slope`
+- `pH Calibration Offset`
+
+Important note:
+
+- `Hydroponic Water Temperature` is the real DS18B20 reading.
+- `Water Temperature` is still a manual template value used by the current TDS compensation formula.
+- If you want TDS to use the DS18B20 automatically, update the TDS lambdas to read `hydro_water_temp_c`.
+
 ## Network Settings
 
 Current static IP assignments:
 
 - Pump: `192.168.1.110`
 - Sensor: `192.168.1.112`
+- Water temperature: `192.168.1.115`
 
 Make sure these addresses do not conflict with other devices on your network.
 
 ## Typical Workflow
 
-1. Edit `pumpy.yaml` or `nft_sensor.yaml`.
+1. Edit `pumpy.yaml`, `nft_sensor.yaml`, or `water_temp.yaml`.
 2. Validate the config with ESPHome.
 3. Upload to the correct board.
 4. Confirm the entities appear in Home Assistant.
-5. Test pump on/off behavior and verify that TDS values stop updating while the pump is running.
+5. Test pump on/off behavior and verify that analog readings stop updating while the pump is running.
 
 ## Suggested Checks After Flashing
 
 - Switch pump mode between `Normal`, `Eco`, and `Super Eco`.
 - Confirm the `NFT Pump` entity changes state correctly in Home Assistant.
-- Turn the pump on and verify TDS values stop updating.
+- Verify the DS18B20 temperature reading updates on `GPIO4`.
+- Verify the pH module reports a changing voltage on `GPIO1`.
+- Turn the pump on and verify pH and TDS values stop updating.
 - Turn the pump off and verify readings resume after about `30s`.
 - Recheck `pump_switch_entity` if the sensor does not pause as expected.
