@@ -136,6 +136,12 @@ sensor:
     accuracy_decimals: 2
     unit_of_measurement: "C"
 
+  # Typical 6-pin pH module wiring:
+  # V+ -> 3.3V or 5V (match your board/module spec)
+  # G / G -> GND
+  # Po -> GPIO1 (analog output used for pH reading)
+  # Do -> optional digital threshold output, not used here
+  # To -> optional temperature output, not used here
   - platform: adc
     pin: GPIO1
     name: "pH ADC"
