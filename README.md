@@ -39,13 +39,17 @@ Important hardware note:
 - Device name: `nft-sensor`
 - Board: `esp32-c3-devkitm-1`
 - TDS ADC pin: `GPIO0`
-- pH ADC pin: `GPIO1`
+- pH `Po` ADC pin: `GPIO1`
+- pH `Do` digital pin: `GPIO3`
+- pH `To` ADC pin: `GPIO2`
 - DS18B20 data pin: `GPIO4`
 
 Exposed sensor values:
 
 - `Hydroponic Water Temperature`
 - `pH ADC`
+- `pH Threshold Digital`
+- `pH Module To Voltage`
 - `pH`
 - `TDS ADC`
 - `TDS Raw ppm`
@@ -68,6 +72,71 @@ Exposed sensor values:
 
 - `Hydroponic Water Temperature`
 
+## ESP32-C3 Pinout Reference
+
+This repo uses `esp32-c3-devkitm-1` for the sensor nodes. The table below is a practical wiring reference for the pins already used in these configs.
+
+### Pins used in this repo
+
+- `GPIO0`
+  Used for `TDS ADC` in `nft_sensor.yaml`.
+  This is also a strapping/boot-related pin, so avoid forcing it to the wrong level during reset.
+- `GPIO1`
+  Used for `pH ADC` in `nft_sensor.yaml`.
+  Safe for analog input in this project and also used as an echo pin in `esp32_pump_waterlevel.yaml`.
+- `GPIO4`
+  Used for `DS18B20 DATA` in `nft_sensor.yaml` and `water_temp.yaml`.
+  Good general-purpose digital pin for the OneWire bus.
+
+### ESP32-C3 wiring cautions
+
+- `GPIO0`
+  Boot-sensitive strapping pin. Be careful when attaching relays, pull-downs, or modules that may hold the pin low during startup.
+- `GPIO2`
+  Also commonly treated as a strapping-sensitive pin. The water level config notes that boot issues may require moving peripherals off this pin.
+- `GPIO12`
+  Do not use. It is reserved for the internal SPI flash on ESP32-C3 boards and is already called out in `esp32_pump_waterlevel.yaml`.
+
+### Suggested sensor mapping for this repo
+
+- `DS18B20 DATA` -> `GPIO4`
+- `pH analog output (Po)` -> `GPIO1`
+- `pH digital output (Do)` -> `GPIO3`
+- `pH To output` -> `GPIO2`
+- `TDS analog output` -> `GPIO0`
+
+### pH module pin mapping
+
+- `V+` -> `3.3V` or `5V` based on the pH board specification
+- `G` -> `GND`
+- `G` -> `GND`
+- `Po` -> `GPIO1`
+- `Do` -> `GPIO3`
+- `To` -> `GPIO2`
+
+### pH module full-function behavior
+
+With the current `nft_sensor.yaml`, all six pins on the pH board are connected and used like this:
+
+- `V+`
+  Powers the pH module board.
+- `G` and `G`
+  Shared ground between the pH module and the ESP32-C3.
+- `Po`
+  Main analog pH output. Published in ESPHome as `pH ADC`, then converted into the `pH` entity using the configured slope and offset.
+- `Do`
+  Digital threshold output. Published as `pH Threshold Digital`.
+  This usually changes state when the board crosses the trigger level set by the onboard potentiometer.
+- `To`
+  Extra analog output. Published as `pH Module To Voltage`.
+  It is currently exposed as a voltage only, because the exact meaning and conversion of `To` depends on the specific pH module board.
+
+Important note:
+
+- `Po` is the pin that provides the real pH measurement used by the `pH` entity.
+- `Do` is not a second pH reading. It is only a threshold signal.
+- `To` is not automatically a temperature sensor in ESPHome unless the exact module documentation confirms what that output represents and how to convert it.
+
 ## Wiring Notes
 
 ### DS18B20
@@ -85,9 +154,19 @@ Exposed sensor values:
 
 ### pH module
 
-- Analog output -> `GPIO1`
+- `Po` / analog output -> `GPIO1`
 - `VCC` -> module-required power
 - `GND` -> `GND`
+- `Do` / digital threshold output -> `GPIO3`
+- `To` / extra analog output -> `GPIO2`
+
+Important note:
+
+- In the current ESPHome config, `Do` is exposed as `pH Threshold Digital`.
+- `To` is exposed as `pH Module To Voltage`.
+- `To` is currently read as a voltage because pH module boards do not all use the same conversion formula for that pin.
+- If your exact module documentation includes a temperature formula for `To`, the YAML can be updated to publish it as real degrees Celsius.
+- For most pH boards, `Po` is the actual measurement output and `Do` is only an adjustable comparator output.
 
 ## TDS Noise Protection
 
