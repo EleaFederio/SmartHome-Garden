@@ -1,6 +1,9 @@
 substitutions:
   pump_switch_entity: switch.nft_pump
   sensor_resume_delay: 30s
+  ph_po_pin: GPIO1
+  ph_do_pin: GPIO3
+  ph_to_pin: GPIO2
 
 esphome:
   name: nft-sensor
@@ -76,6 +79,15 @@ binary_sensor:
               - component.update: tds_calibrated_ppm
               - component.update: tds_comp_voltage
 
+  - platform: gpio
+    name: "pH Threshold Digital"
+    id: ph_threshold_digital
+    pin:
+      number: ${ph_do_pin}
+      mode:
+        input: true
+    device_class: problem
+
 number:
   - platform: template
     name: "TDS Calibration Scale"
@@ -139,11 +151,11 @@ sensor:
   # Typical 6-pin pH module wiring:
   # V+ -> 3.3V or 5V (match your board/module spec)
   # G / G -> GND
-  # Po -> GPIO1 (analog output used for pH reading)
-  # Do -> optional digital threshold output, not used here
-  # To -> optional temperature output, not used here
+  # Po -> ${ph_po_pin} (analog output used for pH reading)
+  # Do -> ${ph_do_pin} (digital threshold output)
+  # To -> ${ph_to_pin} (extra analog output from the module)
   - platform: adc
-    pin: GPIO1
+    pin: ${ph_po_pin}
     name: "pH ADC"
     id: ph_adc
     update_interval: 3s
@@ -156,6 +168,19 @@ sensor:
             return {};
           }
           return x;
+      - sliding_window_moving_average:
+          window_size: 10
+          send_every: 1
+
+  - platform: adc
+    pin: ${ph_to_pin}
+    name: "pH Module To Voltage"
+    id: ph_to_voltage
+    update_interval: 3s
+    attenuation: 12db
+    unit_of_measurement: V
+    accuracy_decimals: 3
+    filters:
       - sliding_window_moving_average:
           window_size: 10
           send_every: 1
