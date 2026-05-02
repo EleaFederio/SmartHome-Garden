@@ -38,6 +38,7 @@ Important hardware note:
 
 - Device name: `nft-sensor`
 - Board: `esp32-c3-devkitm-1`
+- Web server: enabled on port `80`
 - TDS ADC pin: `GPIO0`
 - pH `Po` ADC pin: `GPIO1`
 - pH `Do` digital pin: `GPIO3`
@@ -60,6 +61,8 @@ Exposed sensor values:
 - `TDS Calibration Offset`
 - `pH Calibration Slope`
 - `pH Calibration Offset`
+- `pH Zero Point Reference`
+- `Calibrate pH Zero Point`
 
 ### Standalone water temperature controller
 
@@ -226,6 +229,23 @@ Tunable pH calibration values:
 
 - `pH Calibration Slope`
 - `pH Calibration Offset`
+- `pH Zero Point Reference`
+
+Zero-point calibration workflow:
+
+1. Rinse the pH probe and place it in a known reference solution.
+2. Set `pH Zero Point Reference` to the value of that solution.
+   For a standard neutral calibration, use `7.00`.
+3. Wait for `pH ADC` to stabilize.
+4. Press `Calibrate pH Zero Point`.
+5. ESPHome recalculates and saves `pH Calibration Offset` using:
+   `offset = reference_ph - (measured_voltage * slope)`
+
+Important notes:
+
+- This feature calibrates the `Po` analog output zero point by updating `pH Calibration Offset`.
+- It does not change `pH Calibration Slope`.
+- For best results, do zero-point calibration first, then fine-tune slope with a second buffer solution if needed.
 
 Important note:
 
@@ -242,6 +262,10 @@ Current static IP assignments:
 - Water temperature: `192.168.1.115`
 
 Make sure these addresses do not conflict with other devices on your network.
+
+Web UI addresses:
+
+- Sensor web server: `http://192.168.1.112/`
 
 ## Typical Workflow
 
