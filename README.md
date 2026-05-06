@@ -1,6 +1,6 @@
 # NFT ESPHome Setup
 
-This folder contains the ESPHome configs for the NFT hydroponics pump, nutrient sensor, and water temperature sensor.
+This folder contains ESPHome configs for the NFT hydroponics setup plus nursery controllers for seedling airflow and lighting.
 
 ## Files
 
@@ -10,6 +10,8 @@ This folder contains the ESPHome configs for the NFT hydroponics pump, nutrient 
   Reads TDS, pH, and DS18B20 water temperature on an ESP32-C3 and pauses noisy analog readings while the pump is running.
 - `water_temp.yaml`
   Standalone ESP32-C3 config for a DS18B20 water temperature probe.
+- `nursery/seedling_fan.yaml`
+  ESP32-C3 nursery controller with a DHT22 humidity sensor, a transistor-driven 5V fan output, and a relay-controlled grow light schedule.
 
 ## Devices
 
@@ -75,6 +77,30 @@ Exposed sensor values:
 
 - `Hydroponic Water Temperature`
 
+### Nursery seedling fan controller
+
+- Device name: `seedling_fan`
+- Board: `esp32-c3-devkitm-1`
+- DHT22 data pin: `GPIO10`
+- Fan control pin: `GPIO3`
+- Grow light relay pin: `GPIO4`
+- Time source: `sntp`
+
+Exposed entities:
+
+- `Seedling Temperature`
+- `Seedling Humidity`
+- `Seedling Fan`
+- `Seedling Grow Light`
+
+Automation behavior:
+
+- Fan turns on when humidity rises above `80%`.
+- Fan turns off when humidity falls below `65%`.
+- Grow light turns on daily at `06:00`.
+- Grow light turns off daily at `22:00`.
+- On boot, the device checks current time and restores the correct light state for the active schedule window.
+
 ## ESP32-C3 Pinout Reference
 
 This repo uses `esp32-c3-devkitm-1` for the sensor nodes. The table below is a practical wiring reference for the pins already used in these configs.
@@ -90,6 +116,9 @@ This repo uses `esp32-c3-devkitm-1` for the sensor nodes. The table below is a p
 - `GPIO4`
   Used for `DS18B20 DATA` in `nft_sensor.yaml` and `water_temp.yaml`.
   Good general-purpose digital pin for the OneWire bus.
+- `GPIO10`
+  Used for the `DHT22` data line in `nursery/seedling_fan.yaml`.
+  Suitable for simple digital sensor input on ESP32-C3.
 
 ### ESP32-C3 wiring cautions
 
@@ -107,6 +136,9 @@ This repo uses `esp32-c3-devkitm-1` for the sensor nodes. The table below is a p
 - `pH digital output (Do)` -> `GPIO3`
 - `pH To output` -> `GPIO2`
 - `TDS analog output` -> `GPIO0`
+- `DHT22 DATA` -> `GPIO10`
+- `Fan transistor input` -> `GPIO3`
+- `Grow light relay input` -> `GPIO4`
 
 ### pH module pin mapping
 
@@ -170,6 +202,23 @@ Important note:
 - `To` is currently read as a voltage because pH module boards do not all use the same conversion formula for that pin.
 - If your exact module documentation includes a temperature formula for `To`, the YAML can be updated to publish it as real degrees Celsius.
 - For most pH boards, `Po` is the actual measurement output and `Do` is only an adjustable comparator output.
+
+### Nursery seedling controller
+
+- `DHT22 DATA` -> `GPIO10`
+- `DHT22 VCC` -> `3.3V` or module-rated supply
+- `DHT22 GND` -> `GND`
+- Add the usual DHT22 pull-up resistor if your breakout does not already include one.
+- `Fan transistor control` -> `GPIO3`
+- `Fan power` -> external `5V` supply sized for the fan
+- `Fan ground` -> shared `GND` with the ESP32-C3
+- `Grow light relay input` -> `GPIO4`
+
+Important notes:
+
+- The ESP32-C3 GPIO pin should drive the fan through a transistor or MOSFET, not power the fan directly.
+- If the relay module or transistor stage is active-low, add `inverted: true` to that switch in `nursery/seedling_fan.yaml`.
+- The light schedule in `nursery/seedling_fan.yaml` is currently fixed at `06:00-22:00` for a `16h on / 8h off` cycle.
 
 ## TDS Noise Protection
 
@@ -270,6 +319,7 @@ Web UI addresses:
 ## Typical Workflow
 
 1. Edit `pumpy.yaml`, `nft_sensor.yaml`, or `water_temp.yaml`.
+   For nursery airflow and lighting, edit `nursery/seedling_fan.yaml`.
 2. Validate the config with ESPHome.
 3. Upload to the correct board.
 4. Confirm the entities appear in Home Assistant.
@@ -284,3 +334,4 @@ Web UI addresses:
 - Turn the pump on and verify pH and TDS values stop updating.
 - Turn the pump off and verify readings resume after about `30s`.
 - Recheck `pump_switch_entity` if the sensor does not pause as expected.
+- For `nursery/seedling_fan.yaml`, verify humidity updates on `GPIO10`, the fan turns on above `80%`, turns off below `65%`, and the grow light follows the `06:00-22:00` schedule.

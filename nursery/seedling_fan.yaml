@@ -1,0 +1,90 @@
+esphome:
+  name: seedling_fan
+  friendly_name: Seedling Fan
+  on_boot:
+    priority: -10
+    then:
+      - if:
+          condition:
+            lambda: |-
+              auto now = id(esptime).now();
+              if (!now.is_valid()) {
+                return false;
+              }
+              const int minutes_now = now.hour * 60 + now.minute;
+              return minutes_now >= 6 * 60 && minutes_now < 22 * 60;
+          then:
+            - switch.turn_on: grow_light
+          else:
+            - switch.turn_off: grow_light
+
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: esp32c3
+
+logger:
+
+api:
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  manual_ip:
+      static_ip: 192.168.1.116
+      gateway: 192.168.1.1
+      subnet: 255.255.255.0
+  ap:
+    ssid: "Seedling Fan Fallback"
+    password: "seedlingfan123"
+
+captive_portal:
+
+time:
+  - platform: sntp
+    id: esptime
+    timezone: Asia/Manila
+    on_time:
+      - seconds: 0
+        minutes: 0
+        hours: 6
+        then:
+          - switch.turn_on: grow_light
+      - seconds: 0
+        minutes: 0
+        hours: 22
+        then:
+          - switch.turn_off: grow_light
+
+sensor:
+  - platform: dht
+    pin: GPIO10
+    model: DHT22
+    temperature:
+      name: "Seedling Temperature"
+    humidity:
+      name: "Seedling Humidity"
+      id: seedling_humidity
+      on_value_range:
+        - above: 80
+          then:
+            - switch.turn_on: ventilation_fan
+        - below: 65
+          then:
+            - switch.turn_off: ventilation_fan
+    update_interval: 30s
+
+switch:
+  - platform: gpio
+    id: ventilation_fan
+    name: "Seedling Fan"
+    pin: GPIO3
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  - platform: gpio
+    id: grow_light
+    name: "Seedling Grow Light"
+    pin: GPIO4
+    restore_mode: RESTORE_DEFAULT_OFF
