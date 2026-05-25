@@ -98,14 +98,14 @@ script:
       - switch.turn_off: nft_pump
 
 interval:
-  - interval: 20min
+  - interval: 30min
     then:
       - if:
           condition:
             lambda: 'return id(nft_pump_mode).state == "Eco";'
           then:
             - script.execute: eco_cycle
-  - interval: 30min
+  - interval: 2h
     then:
       - if:
           condition:

@@ -21,6 +21,8 @@ esphome:
 esp32:
   board: esp32-c3-devkitm-1
   variant: esp32c3
+  framework:
+    type: esp-idf
 
 logger:
 
@@ -30,17 +32,14 @@ ota:
   - platform: esphome
 
 wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
+  networks:
+    - ssid: !secret wifi_ssid
+      password: !secret wifi_password
+  output_power: 8.5dB
   manual_ip:
-      static_ip: 192.168.1.116
-      gateway: 192.168.1.1
-      subnet: 255.255.255.0
-  ap:
-    ssid: "Seedling Fan Fallback"
-    password: "seedlingfan123"
-
-captive_portal:
+    static_ip: 192.168.1.118
+    gateway: 192.168.1.1
+    subnet: 255.255.255.0
 
 time:
   - platform: sntp
@@ -58,23 +57,17 @@ time:
         then:
           - switch.turn_off: grow_light
 
+i2c:
+  sda: GPIO6
+  scl: GPIO7
+  frequency: 100kHz
+
 sensor:
-  - platform: dht
-    pin: GPIO10
-    model: DHT22
-    temperature:
-      name: "Seedling Temperature"
-    humidity:
-      name: "Seedling Humidity"
-      id: seedling_humidity
-      on_value_range:
-        - above: 80
-          then:
-            - switch.turn_on: ventilation_fan
-        - below: 65
-          then:
-            - switch.turn_off: ventilation_fan
-    update_interval: 30s
+  - platform: bh1750
+    name: "Light Level"
+    id: light_level
+    address: 0x23
+    update_interval: 5s
 
 switch:
   - platform: gpio
