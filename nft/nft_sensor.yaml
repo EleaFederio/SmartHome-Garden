@@ -44,6 +44,9 @@ wifi:
 logger:
   level: DEBUG
 
+web_server:
+  port: 80
+
 one_wire:
   - platform: gpio
     pin: GPIO4
@@ -139,6 +142,39 @@ number:
     max_value: 30
     step: 0.001
     initial_value: 20.889
+
+  - platform: template
+    name: "pH Zero Point Reference"
+    id: ph_zero_point_reference
+    optimistic: true
+    restore_value: true
+    min_value: 4
+    max_value: 10
+    step: 0.01
+    initial_value: 7.00
+
+button:
+  - platform: template
+    name: "Calibrate pH Zero Point"
+    id: calibrate_ph_zero_point
+    on_press:
+      then:
+        - lambda: |-
+            if (!id(ph_adc).has_state()) {
+              ESP_LOGW("ph_calibration", "pH ADC has no state yet, zero-point calibration skipped");
+              return;
+            }
+            const float measured_voltage = id(ph_adc).state;
+            const float reference_ph = id(ph_zero_point_reference).state;
+            const float new_offset = reference_ph - (measured_voltage * id(ph_slope).state);
+            id(ph_offset).publish_state(new_offset);
+            ESP_LOGI(
+              "ph_calibration",
+              "Zero-point calibration saved using %.3f V and reference pH %.2f. New offset: %.3f",
+              measured_voltage,
+              reference_ph,
+              new_offset
+            );
 
 sensor:
   - platform: dallas_temp

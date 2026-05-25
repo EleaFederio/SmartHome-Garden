@@ -38,6 +38,7 @@ captive_portal:
 web_server:
   port: 80
 
+
 switch:
   - platform: gpio
     id: nursery_light_relay
@@ -45,107 +46,4 @@ switch:
     pin:
       number: GPIO0
       inverted: true
-    restore_mode: RESTORE_DEFAULT_OFF
-
-  - platform: template
-    id: nursery_light_auto_mode
-    name: "Nursery Light Auto Mode"
-    optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
-    turn_on_action:
-      - script.execute: update_nursery_light_state
-    turn_off_action:
-      - switch.turn_off: nursery_light_relay
-
-select:
-  - platform: template
-    id: nursery_light_duration
-    name: "Nursery Light Duration"
-    optimistic: true
-    restore_value: true
-    initial_option: "14 hours"
-    options:
-      - "12 hours"
-      - "14 hours"
-      - "16 hours"
-    on_value:
-      then:
-        - script.execute: update_nursery_light_state
-
-number:
-  - platform: template
-    id: nursery_light_start_hour_number
-    name: "Nursery Light Start Hour"
-    optimistic: true
-    restore_value: true
-    min_value: 0
-    max_value: 23
-    step: 1
-    initial_value: 6
-    mode: box
-    set_action:
-      - script.execute: update_nursery_light_state
-
-text_sensor:
-  - platform: template
-    name: "Nursery Light Schedule"
-    lambda: |-
-      char buffer[32];
-      int start = (int) id(nursery_light_start_hour_number).state;
-      int duration = 14;
-      if (id(nursery_light_duration).state == "12 hours") {
-        duration = 12;
-      } else if (id(nursery_light_duration).state == "16 hours") {
-        duration = 16;
-      }
-      int end = (start + duration) % 24;
-      snprintf(buffer, sizeof(buffer), "%02d:00-%02d:00", start, end);
-      return std::string(buffer);
-    update_interval: 60s
-
-script:
-  - id: update_nursery_light_state
-    mode: restart
-    then:
-      - if:
-          condition:
-            switch.is_on: nursery_light_auto_mode
-          then:
-            - lambda: |-
-                auto now = id(esphome_time).now();
-                if (!now.is_valid()) {
-                  return;
-                }
-
-                int duration = 14;
-                if (id(nursery_light_duration).state == "12 hours") {
-                  duration = 12;
-                } else if (id(nursery_light_duration).state == "16 hours") {
-                  duration = 16;
-                }
-
-                const int start_minutes = ((int) id(nursery_light_start_hour_number).state) * 60;
-                const int end_minutes = (start_minutes + duration * 60) % 1440;
-                const int now_minutes = now.hour * 60 + now.minute;
-
-                bool lights_on = false;
-                if (start_minutes < end_minutes) {
-                  lights_on = now_minutes >= start_minutes && now_minutes < end_minutes;
-                } else if (start_minutes > end_minutes) {
-                  lights_on = now_minutes >= start_minutes || now_minutes < end_minutes;
-                } else {
-                  lights_on = duration > 0;
-                }
-
-                if (lights_on) {
-                  id(nursery_light_relay).turn_on();
-                } else {
-                  id(nursery_light_relay).turn_off();
-                }
-          else:
-            - switch.turn_off: nursery_light_relay
-
-interval:
-  - interval: 1min
-    then:
-      - script.execute: update_nursery_light_state
