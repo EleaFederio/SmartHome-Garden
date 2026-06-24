@@ -3,6 +3,11 @@ esphome:
   friendly_name: T5 Light
   platformio_options:
     upload_speed: 115200
+  # Automatically runs the time check on startup
+  on_boot:
+    priority: -100
+    then:
+      - script.execute: boot_recovery_script
 
 esp8266:
   board: esp01_1m
@@ -22,6 +27,8 @@ wifi:
     static_ip: 192.168.1.111
     gateway: 192.168.1.1
     subnet: 255.255.255.0
+    dns1: 192.168.1.1
+    dns2: 8.8.8.8
   ap:
     ssid: "T5 Light AP"
     password: "hahaha1234"
@@ -32,12 +39,63 @@ logger:
 time:
   - platform: sntp
     id: esphome_time
+    timezone: "UTC-8"
+    update_interval: 15min
+    servers:
+      - ph.pool.ntp.org
+      - 0.pool.ntp.org
+      - 1.pool.ntp.org
+
+    # Standalone daily schedule directly on the hardware
+    on_time:
+      - seconds: 0
+        minutes: 0
+        hours: 5
+        then:
+          - if:
+              condition:
+                lambda: 'return id(nursery_light_mode).state == "Auto";'
+              then:
+                - switch.turn_on: nursery_light_relay
+      - seconds: 0
+        minutes: 0
+        hours: 21
+        then:
+          - if:
+              condition:
+                lambda: 'return id(nursery_light_mode).state == "Auto";'
+              then:
+                - switch.turn_off: nursery_light_relay
+
+interval:
+  - interval: 1min
+    then:
+      - lambda: |-
+          auto now = id(esphome_time).now();
+          if (!now.is_valid()) {
+            ESP_LOGW("time", "SNTP time not valid yet");
+            return;
+          }
+          ESP_LOGI("time", "Current datetime: %04d-%02d-%02d %02d:%02d:%02d",
+                   now.year, now.month, now.day_of_month,
+                   now.hour, now.minute, now.second);
+
+      - if:
+          condition:
+            lambda: 'return id(nursery_light_mode).state == "Auto" && id(esphome_time).now().is_valid() && id(esphome_time).now().hour >= 6 && id(esphome_time).now().hour < 22;'
+          then:
+            - switch.turn_on: nursery_light_relay
+          else:
+            - if:
+                condition:
+                  lambda: 'return id(nursery_light_mode).state == "Auto";'
+                then:
+                  - switch.turn_off: nursery_light_relay
 
 captive_portal:
 
 web_server:
   port: 80
-
 
 switch:
   - platform: gpio
@@ -46,4 +104,52 @@ switch:
     pin:
       number: GPIO0
       inverted: true
-    restore_mode: RESTORE_DEFAULT_ON
+    # Prevents turning on blindly at midnight if power blinks
+    restore_mode: RESTORE_DEFAULT_OFF
+
+select:
+  - platform: template
+    id: nursery_light_mode
+    name: "Nursery Light Mode"
+    optimistic: true
+    restore_value: true
+    initial_option: "Normal"
+    options:
+      - "Normal"
+      - "Auto"
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return x == "Auto";'
+            then:
+              - script.execute: apply_auto_mode
+
+script:
+  - id: apply_auto_mode
+    mode: single
+    then:
+      - if:
+          condition:
+            lambda: 'return id(esphome_time).now().is_valid() && id(esphome_time).now().hour >= 6 && id(esphome_time).now().hour < 22;'
+          then:
+            - switch.turn_on: nursery_light_relay
+          else:
+            - switch.turn_off: nursery_light_relay
+
+  - id: boot_recovery_script
+    mode: restart
+    then:
+      - while:
+          condition:
+            # Loop safely while waiting for a valid network time sync
+            lambda: 'return !id(esphome_time).now().is_valid();'
+          then:
+            - delay: 5s
+      # Time is now verified! Evaluate and fix light state immediately
+      - if:
+          condition:
+            lambda: 'return id(nursery_light_mode).state == "Auto";'
+          then:
+            - script.execute: apply_auto_mode
+      # Script reaches the end and closes cleanly without continuous looping

@@ -113,15 +113,24 @@ number:
     initial_value: 0
 
   - platform: template
-    name: "Water Temperature"
-    id: water_temp_c
+    name: "Water Temperature Calibration Scale"
+    id: water_temp_scale
     optimistic: true
     restore_value: true
-    min_value: 0
-    max_value: 50
+    min_value: 0.8
+    max_value: 1.2
+    step: 0.001
+    initial_value: 1.0
+
+  - platform: template
+    name: "Water Temperature Calibration Offset"
+    id: water_temp_offset
+    optimistic: true
+    restore_value: true
+    min_value: -5
+    max_value: 5
     step: 0.1
-    initial_value: 25.0
-    unit_of_measurement: "C"
+    initial_value: 0.0
 
   - platform: template
     name: "pH Calibration Slope"
@@ -143,46 +152,90 @@ number:
     step: 0.001
     initial_value: 20.889
 
-  - platform: template
-    name: "pH Zero Point Reference"
-    id: ph_zero_point_reference
-    optimistic: true
-    restore_value: true
-    min_value: 4
-    max_value: 10
-    step: 0.01
-    initial_value: 7.00
-
 button:
   - platform: template
-    name: "Calibrate pH Zero Point"
-    id: calibrate_ph_zero_point
+    name: "Calibrate pH 4.01"
+    id: calibrate_ph_401
     on_press:
       then:
         - lambda: |-
             if (!id(ph_adc).has_state()) {
-              ESP_LOGW("ph_calibration", "pH ADC has no state yet, zero-point calibration skipped");
+              ESP_LOGW("ph_calibration", "pH ADC has no state yet, calibration skipped");
               return;
             }
             const float measured_voltage = id(ph_adc).state;
-            const float reference_ph = id(ph_zero_point_reference).state;
+            const float reference_ph = 4.01f;
             const float new_offset = reference_ph - (measured_voltage * id(ph_slope).state);
             id(ph_offset).publish_state(new_offset);
             ESP_LOGI(
               "ph_calibration",
-              "Zero-point calibration saved using %.3f V and reference pH %.2f. New offset: %.3f",
+              "pH 4.01 calibration saved using %.3f V. New offset: %.3f",
               measured_voltage,
-              reference_ph,
+              new_offset
+            );
+
+  - platform: template
+    name: "Calibrate pH 6.86"
+    id: calibrate_ph_686
+    on_press:
+      then:
+        - lambda: |-
+            if (!id(ph_adc).has_state()) {
+              ESP_LOGW("ph_calibration", "pH ADC has no state yet, calibration skipped");
+              return;
+            }
+            const float measured_voltage = id(ph_adc).state;
+            const float reference_ph = 6.86f;
+            const float new_offset = reference_ph - (measured_voltage * id(ph_slope).state);
+            id(ph_offset).publish_state(new_offset);
+            ESP_LOGI(
+              "ph_calibration",
+              "pH 6.86 calibration saved using %.3f V. New offset: %.3f",
+              measured_voltage,
+              new_offset
+            );
+
+  - platform: template
+    name: "Calibrate pH 9.18"
+    id: calibrate_ph_918
+    on_press:
+      then:
+        - lambda: |-
+            if (!id(ph_adc).has_state()) {
+              ESP_LOGW("ph_calibration", "pH ADC has no state yet, calibration skipped");
+              return;
+            }
+            const float measured_voltage = id(ph_adc).state;
+            const float reference_ph = 9.18f;
+            const float new_offset = reference_ph - (measured_voltage * id(ph_slope).state);
+            id(ph_offset).publish_state(new_offset);
+            ESP_LOGI(
+              "ph_calibration",
+              "pH 9.18 calibration saved using %.3f V. New offset: %.3f",
+              measured_voltage,
               new_offset
             );
 
 sensor:
   - platform: dallas_temp
-    name: "Hydroponic Water Temperature"
-    id: hydro_water_temp_c
+    name: "Hydroponic Water Temperature Raw"
+    id: hydro_water_temp_c_raw
     update_interval: 3s
     accuracy_decimals: 2
     unit_of_measurement: "C"
+
+  - platform: template
+    name: "Hydroponic Water Temperature"
+    id: hydro_water_temp_c
+    lambda: |-
+      if (!id(hydro_water_temp_c_raw).has_state()) {
+        return {};
+      }
+      float raw_temp = id(hydro_water_temp_c_raw).state;
+      return raw_temp * id(water_temp_scale).state + id(water_temp_offset).state;
+    unit_of_measurement: "C"
+    accuracy_decimals: 2
+    update_interval: 3s
 
   # Typical 6-pin pH module wiring:
   # V+ -> 3.3V or 5V (match your board/module spec)
@@ -262,7 +315,7 @@ sensor:
         return {};
       }
       float voltage = id(tds_adc).state;
-      float compensation_coefficient = 1.0f + 0.02f * (id(water_temp_c).state - 25.0f);
+      float compensation_coefficient = 1.0f + 0.02f * (id(hydro_water_temp_c).state - 25.0f);
       float compensated_voltage = voltage / compensation_coefficient;
       float tds = (133.42f * compensated_voltage * compensated_voltage * compensated_voltage
                   - 255.86f * compensated_voltage * compensated_voltage
@@ -296,7 +349,7 @@ sensor:
         return {};
       }
       float voltage = id(tds_adc).state;
-      float compensation_coefficient = 1.0f + 0.02f * (id(water_temp_c).state - 25.0f);
+      float compensation_coefficient = 1.0f + 0.02f * (id(hydro_water_temp_c).state - 25.0f);
       return voltage / compensation_coefficient;
     unit_of_measurement: "V"
     accuracy_decimals: 3

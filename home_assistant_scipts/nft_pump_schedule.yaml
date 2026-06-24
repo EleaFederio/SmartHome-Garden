@@ -1,0 +1,35 @@
+alias: "NFT Pump: Schedule Modes"
+description: "Automatically switches Pumpy modes based on the time of day"
+trigger:
+  - platform: time
+    at: "06:00:00"
+    variables:
+      mode: "Eco"
+  - platform: time
+    at: "11:00:00"
+    variables:
+      mode: "Noon-Time"
+  - platform: time
+    at: "15:00:00"
+    variables:
+      mode: "Eco"
+  - platform: time
+    at: "18:00:00"
+    variables:
+      mode: "Super Eco"
+  - platform: homeassistant
+    event: start
+    variables:
+      mode: >
+        {% set reset_time = now().strftime('%H:%M') %}
+        {% if '06:00' <= reset_time < '11:00' %} Eco
+        {% elif '11:00' <= reset_time < '15:00' %} Noon-Time
+        {% elif '15:00' <= reset_time < '18:00' %} Eco
+        {% else %} Super Eco
+        {% endif %}
+action:
+  - service: select.select_option
+    target:
+      entity_id: select.pumpy_nft_pump_mode
+    data:
+      option: "{{ mode }}"
