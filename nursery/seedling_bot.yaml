@@ -58,26 +58,41 @@ time:
           - switch.turn_off: grow_light
 
 i2c:
-  sda: GPIO6
-  scl: GPIO7
-  frequency: 100kHz
+  - id: main_i2c
+    sda: GPIO3
+    scl: GPIO4
+    frequency: 100kHz
+
+  - id: exp_i2c
+    sda: GPIO6
+    scl: GPIO7
+    frequency: 100kHz
 
 sensor:
   - platform: bh1750
+    i2c_id: main_i2c
     name: "Light Level"
     id: light_level
     address: 0x23
     update_interval: 5s
 
+  - platform: aht10
+    i2c_id: exp_i2c
+    temperature:
+      name: "Temperature"
+    humidity:
+      name: "Humidity"
+    update_interval: 60s
+
 switch:
   - platform: gpio
     id: ventilation_fan
     name: "Seedling Fan"
-    pin: GPIO3
+    pin: GPIO5
     restore_mode: RESTORE_DEFAULT_OFF
 
   - platform: gpio
     id: grow_light
     name: "Seedling Grow Light"
-    pin: GPIO4
+    pin: GPIO10
     restore_mode: RESTORE_DEFAULT_OFF

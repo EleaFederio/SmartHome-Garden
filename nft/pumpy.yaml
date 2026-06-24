@@ -32,6 +32,36 @@ logger:
 time:
   - platform: sntp
     id: esphome_time
+    # Internal cron schedules to change modes automatically if offline
+    on_time:
+      - seconds: 0
+        minutes: 0
+        hours: 6
+        then:
+          - select.set:
+              id: nft_pump_mode
+              option: "Eco"
+      - seconds: 0
+        minutes: 0
+        hours: 11
+        then:
+          - select.set:
+              id: nft_pump_mode
+              option: "Noon-Time"
+      - seconds: 0
+        minutes: 0
+        hours: 15
+        then:
+          - select.set:
+              id: nft_pump_mode
+              option: "Eco"
+      - seconds: 0
+        minutes: 0
+        hours: 18
+        then:
+          - select.set:
+              id: nft_pump_mode
+              option: "Super Eco"
 
 captive_portal:
 
@@ -56,59 +86,95 @@ select:
     id: nft_pump_mode
     optimistic: true
     restore_value: true
+    initial_option: "Eco"
     options:
       - "Normal"
       - "Eco"
       - "Super Eco"
+      - "Noon-Time"
+      - "Emergency"
     on_value:
       then:
+        # Stop all running background scripts first
+        - script.stop: noon_time_cycle
+        - script.stop: eco_cycle
+        - script.stop: super_eco_cycle
+        - script.stop: emergency_cycle
+        # Execute the logic for the chosen mode
         - if:
             condition:
-              lambda: 'return id(nft_pump_mode).state == "Normal";'
+              lambda: 'return x == "Normal";'
             then:
               - switch.turn_on: nft_pump
         - if:
             condition:
-              lambda: 'return id(nft_pump_mode).state != "Normal";'
-            then:
-              - switch.turn_off: nft_pump
-        - if:
-            condition:
-              lambda: 'return id(nft_pump_mode).state == "Eco";'
+              lambda: 'return x == "Eco";'
             then:
               - script.execute: eco_cycle
         - if:
             condition:
-              lambda: 'return id(nft_pump_mode).state == "Super Eco";'
+              lambda: 'return x == "Super Eco";'
             then:
               - script.execute: super_eco_cycle
+        - if:
+            condition:
+              lambda: 'return x == "Noon-Time";'
+            then:
+              - script.execute: noon_time_cycle
+        - if:
+            condition:
+              lambda: 'return x == "Emergency";'
+            then:
+              - script.execute: emergency_cycle
 
 script:
+  - id: noon_time_cycle
+    mode: restart
+    then:
+      - while:
+          condition:
+            lambda: 'return id(nft_pump_mode).state == "Noon-Time";'
+          then:
+            - switch.turn_on: nft_pump
+            - delay: 15min
+            - switch.turn_off: nft_pump
+            - delay: 5min
+
   - id: eco_cycle
     mode: restart
     then:
-      - switch.turn_on: nft_pump
-      - delay: 15min
-      - switch.turn_off: nft_pump
-  - id: super_eco_cycle
-    mode: restart
-    then:
-      - switch.turn_on: nft_pump
-      - delay: 15min
-      - switch.turn_off: nft_pump
-
-interval:
-  - interval: 30min
-    then:
-      - if:
+      - while:
           condition:
             lambda: 'return id(nft_pump_mode).state == "Eco";'
           then:
-            - script.execute: eco_cycle
-  - interval: 2h
+            - switch.turn_on: nft_pump
+            - delay: 15min
+            - switch.turn_off: nft_pump
+            - delay: 15min # Corrected from 15min to 45min
+
+
+  - id: super_eco_cycle
+    mode: restart
     then:
-      - if:
+      - while:
           condition:
             lambda: 'return id(nft_pump_mode).state == "Super Eco";'
           then:
-            - script.execute: super_eco_cycle
+            - switch.turn_on: nft_pump
+            - delay: 15min
+            - switch.turn_off: nft_pump
+            - delay: 45min # Corrected from 15min to 45min
+
+  - id: emergency_cycle
+    mode: restart
+    then:
+      - while:
+          condition:
+            lambda: 'return id(nft_pump_mode).state == "Emergency";'
+          then:
+            - switch.turn_on: nft_pump
+            - delay: 5min
+            - switch.turn_off: nft_pump
+            - delay: 5min
+
+
